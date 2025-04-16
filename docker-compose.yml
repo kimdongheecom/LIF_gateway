@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:15
+    container_name: gateway-db  ## db 컨테이너
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=gateway
+    ports:
+      - "5433:5432"
+    volumes:
+      - gateway_data:/var/lib/postgresql/data
+    restart: always
+
+  api:
+    build: .
+    container_name: gateway-service ##백엔드 컨테이너
+    volumes:
+      - .:/app
+    ports:
+      - "8080:8080"
+    environment:
+      - DOMAIN=www.jinmini.com
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=gateway
+      - DB_USER=postgres
+      - DB_PASS=postgres
+    env_file:
+      - .env
+    depends_on:
+      - db
+volumes:
+  gateway_data:
+ 
