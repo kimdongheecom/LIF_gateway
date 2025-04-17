@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:15
-    container_name: gateway-db  ## db 컨테이너
+    container_name: gateway-db  ## db 컨테이너 생성
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -14,7 +14,7 @@ services:
 
   api:
     build: .
-    container_name: gateway-service ##백엔드 컨테이너
+    container_name: gateway-service ##백엔드 컨테이너 생성
     volumes:
       - .:/app
     ports:

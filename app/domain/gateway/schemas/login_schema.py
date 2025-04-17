@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
-class OAuthSchema(BaseModel):
+class LoginSchema(BaseModel):
     provider: str
     code: str
     redirect_uri: Optional[str] = None
@@ -16,7 +16,7 @@ class OAuthSchema(BaseModel):
             }
         }
 
-class OAuthResponseSchema(BaseModel):
+class LoginResponseSchema(BaseModel):
     access_token: str
     token_type: str = "Bearer"
     expires_in: int

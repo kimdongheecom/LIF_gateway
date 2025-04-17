@@ -8,8 +8,8 @@
  docker exec -it gateway-db psql -U postgres -d postgres        #exec : 안으로 들어가는 것
  docker exec -it gateway-service bash
  docker compose logs auth (백엔드를 밖에서 보는 것)
- docker-compose logs --tail=500 auth
- docker-compose logs --tail=1000 auth
+ docker-compose logs --tail=500 api
+ docker-compose logs --tail=1000 api
 
  docker-compose build --no-cache backend (백엔드에서만 캐쉬없이 빌드하는 방법)
  docker compose up --build -d

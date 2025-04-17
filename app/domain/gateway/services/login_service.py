@@ -1,6 +1,6 @@
-from app.domain.gateway.repositories.gateway_repository import OAuthRepository
-from app.domain.gateway.models.gateway_model import OAuthEntity
-from app.domain.gateway.schemas.gateway_schema import OAuthSchema, OAuthResponseSchema
+from app.domain.gateway.repositories.login_repository import LoginRepository
+from app.domain.gateway.models.login_model import LoginEntity
+from app.domain.gateway.schemas.login_schema import LoginResponseSchema, LoginSchema
 import httpx
 import os
 import shortuuid
@@ -8,40 +8,40 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 
 
-class OAuthService:
-    """OAuth 인증 서비스 클래스"""
+class LoginService:
+    """Login 인증 서비스 클래스"""
     
     def __init__(self):
         """서비스 초기화"""
-        self.repository = OAuthRepository()
+        self.repository = LoginRepository()
         
     async def initialize(self):
         """서비스 초기화 작업"""
         # 테이블 초기화
         await self.repository.init_table()
     
-    async def get_oauth_by_id(self, id: str) -> Optional[OAuthEntity]:
-        """ID로 OAuth 정보를 조회합니다"""
-        return await self.repository.find_oauth_by_id(id)
+    async def get_login_by_id(self, id: str) -> Optional[LoginEntity]:
+        """ID로 Login 정보를 조회합니다"""
+        return await self.repository.find_login_by_id(id)
     
-    async def get_oauth_by_provider(self, provider: str) -> List[OAuthEntity]:
-        """제공자별 OAuth 정보를 조회합니다"""
-        return await self.repository.find_oauth_by_provider(provider)
+    async def get_login_by_provider(self, provider: str) -> List[LoginEntity]:
+        """제공자별 Login 정보를 조회합니다"""
+        return await self.repository.find_login_by_provider(provider)
     
-    async def create_oauth(self, oauth_data: OAuthSchema) -> OAuthResponseSchema:
-        """OAuth 인증 정보를 생성합니다"""
-        provider = oauth_data.provider
-        code = oauth_data.code
-        redirect_uri = oauth_data.redirect_uri
+    async def create_login(self, login_data: LoginSchema) -> LoginResponseSchema:
+        """Login 인증 정보를 생성합니다"""
+        provider = login_data.provider
+        code = login_data.code
+        redirect_uri = login_data.redirect_uri
         
-        # 외부 OAuth 서비스에 토큰 요청
+        # 외부 Login 서비스에 토큰 요청
         token_response = await self._exchange_code_for_token(provider, code, redirect_uri)
         
         if not token_response or 'access_token' not in token_response:
             raise Exception(f"Failed to get token from {provider}")
         
         # 토큰 정보 저장
-        oauth_entity = OAuthEntity(
+        login_entity = LoginEntity(
             id=shortuuid.uuid(),
             provider=provider,
             access_token=token_response['access_token'],
@@ -51,58 +51,58 @@ class OAuthService:
         )
         
         # 저장
-        await self.repository.save_oauth(oauth_entity)
+        await self.repository.save_login(login_entity)
         
         # 응답 생성
-        return OAuthResponseSchema(
-            access_token=oauth_entity.access_token,
+        return LoginResponseSchema(
+            access_token=login_entity.access_token,
             token_type="Bearer",
             expires_in=token_response.get('expires_in', 3600),
-            refresh_token=oauth_entity.refresh_token,
+            refresh_token=login_entity.refresh_token,
             scope=token_response.get('scope'),
-            created_at=oauth_entity.created_at
+            created_at=login_entity.created_at
         )
     
-    async def refresh_oauth_token(self, id: str) -> Optional[OAuthResponseSchema]:
+    async def refresh_login_token(self, id: str) -> Optional[LoginResponseSchema]:
         """토큰을 갱신합니다"""
         # 기존 토큰 조회
-        oauth_entity = await self.repository.find_oauth_by_id(id)
+        login_entity = await self.repository.find_login_by_id(id)
         
-        if not oauth_entity or not oauth_entity.refresh_token:
+        if not login_entity or not login_entity.refresh_token:
             return None
         
         # 리프레시 토큰으로 새 토큰 요청
         token_response = await self._refresh_token(
-            oauth_entity.provider, 
-            oauth_entity.refresh_token
+            login_entity.provider, 
+            login_entity.refresh_token
         )
         
         if not token_response or 'access_token' not in token_response:
             return None
         
         # 토큰 정보 업데이트
-        oauth_entity.access_token = token_response['access_token']
+        login_entity.access_token = token_response['access_token']
         if 'refresh_token' in token_response:
-            oauth_entity.refresh_token = token_response['refresh_token']
+            login_entity.refresh_token = token_response['refresh_token']
         
-        oauth_entity.expires_at = datetime.now() + timedelta(seconds=token_response.get('expires_in', 3600))
+        login_entity.expires_at = datetime.now() + timedelta(seconds=token_response.get('expires_in', 3600))
         
         # 저장
-        await self.repository.save_oauth(oauth_entity)
+        await self.repository.save_login(login_entity)
         
         # 응답 생성
-        return OAuthResponseSchema(
-            access_token=oauth_entity.access_token,
+        return LoginResponseSchema(
+            access_token=login_entity.access_token,
             token_type="Bearer",
             expires_in=token_response.get('expires_in', 3600),
-            refresh_token=oauth_entity.refresh_token,
+            refresh_token=login_entity.refresh_token,
             scope=token_response.get('scope'),
-            created_at=oauth_entity.created_at
+            created_at=login_entity.created_at
         )
     
-    async def delete_oauth(self, id: str) -> bool:
-        """OAuth 정보를 삭제합니다"""
-        return await self.repository.delete_oauth(id)
+    async def delete_login(self, id: str) -> bool:
+        """Login 정보를 삭제합니다"""
+        return await self.repository.delete_login(id)
     
     async def _exchange_code_for_token(self, provider: str, code: str, redirect_uri: Optional[str] = None) -> dict:
         """인증 코드를 토큰으로 교환합니다"""
@@ -164,22 +164,22 @@ class OAuthService:
             return {}
     
     def _get_provider_config(self, provider: str) -> tuple:
-        """OAuth 제공자별 설정 정보를 가져옵니다"""
+        """Login 제공자별 설정 정보를 가져옵니다"""
         if provider.lower() == 'google':
             return (
-                'https://oauth2.googleapis.com/token',
+                'https://login2.googleapis.com/token',
                 os.getenv('GOOGLE_CLIENT_ID', ''),
                 os.getenv('GOOGLE_CLIENT_SECRET', '')
             )
         elif provider.lower() == 'facebook':
             return (
-                'https://graph.facebook.com/v16.0/oauth/access_token',
+                'https://graph.facebook.com/v16.0/login/access_token',
                 os.getenv('FACEBOOK_CLIENT_ID', ''),
                 os.getenv('FACEBOOK_CLIENT_SECRET', '')
             )
         elif provider.lower() == 'github':
             return (
-                'https://github.com/login/oauth/access_token',
+                'https://github.com/login/login/access_token',
                 os.getenv('GITHUB_CLIENT_ID', ''),
                 os.getenv('GITHUB_CLIENT_SECRET', '')
             )

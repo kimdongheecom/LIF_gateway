@@ -1,12 +1,14 @@
-from app.domain.gateway.models.gateway_model import OAuthEntity
+
 from typing import Optional, List, Dict
 import asyncpg
 from datetime import datetime
 import os
 
+from app.domain.gateway.models.login_model import LoginEntity
 
-class OAuthRepository:
-    """OAuth 데이터 관리를 위한 레포지토리 클래스"""
+
+class LoginRepository:
+    """Login 데이터 관리를 위한 레포지토리 클래스"""
     
     def __init__(self, pool: asyncpg.Pool = None):
         """레포지토리 초기화
@@ -15,7 +17,7 @@ class OAuthRepository:
             pool: 데이터베이스 연결 풀
         """
         self.pool = pool
-        self._entities: Dict[str, OAuthEntity] = {}  # 메모리 캐시 (개발용)
+        self._entities: Dict[str, LoginEntity] = {}  # 메모리 캐시 (개발용)
     
     async def _get_connection(self):
         """데이터베이스 연결을 가져옵니다."""
@@ -44,12 +46,12 @@ class OAuthRepository:
             await self.pool.release(conn)
 
     async def init_table(self):
-        """OAuth 테이블을 초기화합니다."""
+        """Login 테이블을 초기화합니다."""
         conn = None
         try:
             conn = await self._get_connection()
             await conn.execute('''
-                CREATE TABLE IF NOT EXISTS oauth_entities (
+                CREATE TABLE IF NOT EXISTS login_entities (
                     id VARCHAR(50) PRIMARY KEY,
                     provider VARCHAR(50) NOT NULL,
                     access_token TEXT NOT NULL,
@@ -62,40 +64,40 @@ class OAuthRepository:
             if conn:
                 await self._release_connection(conn)
 
-    async def save_oauth(self, oauth: OAuthEntity) -> OAuthEntity:
-        """OAuth 정보를 저장합니다"""
+    async def save_login(self, login: LoginEntity) -> LoginEntity:
+        """Login 정보를 저장합니다"""
         conn = None
         try:
             # 개발환경에서는 메모리에 저장
-            self._entities[oauth.id] = oauth
+            self._entities[login.id] = login
             
             # 데이터베이스에 저장
             if self.pool:
                 conn = await self._get_connection()
                 try:
                     await conn.execute('''
-                        INSERT INTO oauth_entities(id, provider, access_token, refresh_token, expires_at, created_at)
+                        INSERT INTO login_entities(id, provider, access_token, refresh_token, expires_at, created_at)
                         VALUES($1, $2, $3, $4, $5, $6)
                         ON CONFLICT (id) DO UPDATE 
                         SET provider = $2, 
                             access_token = $3, 
                             refresh_token = $4,
                             expires_at = $5
-                    ''', oauth.id, oauth.provider, oauth.access_token, oauth.refresh_token, 
-                    oauth.expires_at, oauth.created_at)
+                    ''', login.id, login.provider, login.access_token, login.refresh_token, 
+                    login.expires_at, login.created_at)
                 finally:
                     await self._release_connection(conn)
             
-            return oauth
+            return login
         except Exception as e:
-            print(f"Error saving OAuth: {e}")
+            print(f"Error saving Login: {e}")
             raise
         finally:
             if conn:
                 await self._release_connection(conn)
 
-    async def find_oauth_by_id(self, id: str) -> Optional[OAuthEntity]:
-        """ID로 OAuth 정보를 조회합니다"""
+    async def find_login_by_id(self, id: str) -> Optional[LoginEntity]:
+        """ID로 Login 정보를 조회합니다"""
         conn = None
         try:
             # 개발환경에서는 메모리에서 조회
@@ -107,11 +109,11 @@ class OAuthRepository:
                 conn = await self._get_connection()
                 try:
                     row = await conn.fetchrow(
-                        'SELECT * FROM oauth_entities WHERE id = $1', id
+                        'SELECT * FROM login_entities WHERE id = $1', id
                     )
                     
                     if row:
-                        return OAuthEntity(
+                        return LoginEntity(
                             id=row['id'],
                             provider=row['provider'],
                             access_token=row['access_token'],
@@ -124,14 +126,14 @@ class OAuthRepository:
             
             return None
         except Exception as e:
-            print(f"Error finding OAuth by ID: {e}")
+            print(f"Error finding Login by ID: {e}")
             return None
         finally:
             if conn:
                 await self._release_connection(conn)
         
-    async def find_oauth_by_provider(self, provider: str) -> List[OAuthEntity]:
-        """제공자별로 OAuth 정보를 조회합니다"""
+    async def find_login_by_provider(self, provider: str) -> List[LoginEntity]:
+        """제공자별로 Login 정보를 조회합니다"""
         conn = None
         try:
             # 개발환경에서는 메모리에서 조회
@@ -145,11 +147,11 @@ class OAuthRepository:
                 conn = await self._get_connection()
                 try:
                     rows = await conn.fetch(
-                        'SELECT * FROM oauth_entities WHERE provider = $1', provider
+                        'SELECT * FROM login_entities WHERE provider = $1', provider
                     )
                     
                     for row in rows:
-                        result.append(OAuthEntity(
+                        result.append(LoginEntity(
                             id=row['id'],
                             provider=row['provider'],
                             access_token=row['access_token'],
@@ -162,14 +164,14 @@ class OAuthRepository:
             
             return result
         except Exception as e:
-            print(f"Error finding OAuth by provider: {e}")
+            print(f"Error finding Login by provider: {e}")
             return []
         finally:
             if conn:
                 await self._release_connection(conn)
         
-    async def delete_oauth(self, id: str) -> bool:
-        """OAuth 정보를 삭제합니다"""
+    async def delete_login(self, id: str) -> bool:
+        """Login 정보를 삭제합니다"""
         conn = None
         try:
             # 개발환경에서는 메모리에서 삭제
@@ -181,7 +183,7 @@ class OAuthRepository:
                 conn = await self._get_connection()
                 try:
                     result = await conn.execute(
-                        'DELETE FROM oauth_entities WHERE id = $1', id
+                        'DELETE FROM login_entities WHERE id = $1', id
                     )
                     return "DELETE" in result
                 finally:
@@ -189,7 +191,7 @@ class OAuthRepository:
             
             return True
         except Exception as e:
-            print(f"Error deleting OAuth: {e}")
+            print(f"Error deleting Login: {e}")
             return False
         finally:
             if conn:

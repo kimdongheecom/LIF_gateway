@@ -1,33 +1,35 @@
-from fastapi import FastAPI, Request
+from typing import Any, Dict
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import httpx
 import os
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from app.api.gateway.tokens_router import router as tokens_router
+from app.api.gateway.finance_router import router as finance_router
+from app.api.gateway.esg_router import router as esg_router
+from app.api.gateway.login_router import router as login_router
 
-from app.domain.gateway.controllers.gateway_controller import router as gateway_router
-from app.domain.gateway.services.gateway_service import OAuthService
+
+
 
 # .env 파일 로드
 load_dotenv()
 
-# ✅ OAuthService 인스턴스 생성
-oauth_service = OAuthService()
 
-# ✅ lifespan 함수 정의
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await oauth_service.initialize()  # 앱 시작 시 테이블 초기화
-    yield  # (앱 종료 시 정리 로직이 필요하면 여기에 추가)
 
-# ✅ FastAPI 앱 생성 (lifespan 적용)
+# ✅ FastAPI 앱 생성 
 app = FastAPI(
     title="Gateway API",
     description="Gateway API for jinmini.com",
     version="0.1.0",
-    lifespan=lifespan
+
 )
+gateway_router = APIRouter(prefix="/e")
+
+
 
 # ✅ CORS 설정
 app.add_middleware(
@@ -37,48 +39,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+GATEWAY_SERVICE_URL = os.getenv("GATEWAY_SERVICE_URL")
 
-# ✅ 루트 경로 핸들러
-@app.get("/")
-async def root():
-    return {"message": "Welcome to jinmini.com Gateway API"}
+if not GATEWAY_SERVICE_URL:
+    raise ValueError("GATEWAY_SERVICE_URL environment variable is not set")
 
-@gateway_router.get("/")
-async def hello_world():
-    return {"message": "Hello World"}
 
-@gateway_router.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+# ✅ 애플리케이션 시작 시 `init_db()` 실행
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🚀🚀🚀🚀 FastAPI 앱이 시작됩니다. 데이터베이스 초기화 중...")
+    # await init_db()  # ✅ DB 초기화 실행
+    # print("✅ 데이터베이스 초기화 완료!")
+    yield  # 애플리케이션이 실행되는 동안 유지
+    print("🛑 FastAPI 앱이 종료됩니다.")
 
-# ✅ auth 프록시 경로 직접 등록
-@app.api_route("/e/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def auth_proxy(request: Request, path: str):
-    async with httpx.AsyncClient() as client:
-        auth_service_url = os.getenv("AUTH_SERVICE_URL")
-        if not auth_service_url:
-            raise Exception("AUTH_SERVICE_URL이 .env 파일에 설정되지 않았습니다.")
-        
-        url = f"{auth_service_url}/{path}"
-        body = await request.body()
-        headers = dict(request.headers)
-        headers.pop("host", None)
-        
-        response = await client.request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            content=body,
-            params=request.query_params
-        )
-        return JSONResponse(
-            content=response.json(),
-            status_code=response.status_code,
-            headers=dict(response.headers)
-        )
+app.include_router(gateway_router)
 
-# ✅ Gateway Router 등록 (/e로 prefix 고정)
-app.include_router(gateway_router, prefix="/e")
+
+# tokens_router 등록 (최종 경로가 /e/tokens이 되도록 설정)
+app.include_router(tokens_router, prefix="/e")
+
+# login_router 등록 (최종 경로가 /e/login이 되도록 설정)
+app.include_router(login_router, prefix="/e")
+
+# esg_router 등록 (최종 경로가 /e/esg이 되도록 설정)
+app.include_router(esg_router, prefix="/e")
+
+# finance_router 등록 (최종 경로가 /e/finance이 되도록 설정)
+app.include_router(finance_router, prefix="/e")
+
 
 # ✅ 서버 실행
 if __name__ == "__main__":

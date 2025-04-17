@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-class OAuthEntity(BaseModel):
+class LoginEntity(BaseModel):
     id: str
     provider: str
     access_token: str
